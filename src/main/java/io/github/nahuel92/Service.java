@@ -28,10 +28,14 @@ public class Service {
         }
     }
 
-    public List<Long> getEnabled() {
+    public List<Long> getEnabledBugged() {
         return Stream.of((Callable<List<Long>>) entityRepository::getEnabled)
                 .map(Service::execute)          // Run IO-bound task on another thread
                 .flatMap(Collection::stream)
                 .toList();
+    }
+
+    public List<Long> getEnabledGood() {
+        return entityRepository.getEnabled();
     }
 }
