@@ -22,7 +22,7 @@ public abstract class EntityRepository {
                 statement -> {
                     final var resultSet = statement.executeQuery();
                     final var enabled = new ArrayList<Long>();
-                    if (resultSet.next()) {
+                    while (resultSet.next()) {
                         enabled.add(resultSet.getLong("id"));
                     }
                     return enabled;

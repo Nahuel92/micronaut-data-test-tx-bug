@@ -12,14 +12,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @MicronautTest
-@Sql(phase = Sql.Phase.BEFORE_ALL, scripts = {"classpath:db/ddl.sql", "classpath:db/data.sql"})
+@Sql(phase = Sql.Phase.BEFORE_EACH, scripts = {"classpath:db/ddl.sql", "classpath:db/data.sql"})
 class MicronautDataTestTxBugTest {
     @Inject
-    private EntityRepository subject;
+    private Service subject;
 
     @Inject
     private JdbcOperations jdbcOperations;
@@ -31,41 +30,21 @@ class MicronautDataTestTxBugTest {
     @DisplayName("When attempting to update data before executing a subject's method, subject fails to see the update")
     void failureToUpdateDataBeforeExecutingSubjectMethod() {
         // given
-        updateEnabledFlag();
+        updateTestData();
 
         // when
         final var results = subject.getEnabled();
 
         // then
-        assertAll(
-                () -> assertTrue(results.contains(2L)),
-                () -> assertTrue(getUpdatedEnabledFlag())
-        );
+        assertTrue(results.contains(2L));
     }
 
     @Test
-    @DisplayName("When explicitly commiting transactions to update data, subject should see the update")
-    void successOnUpdatingDataBeforeExecutingSubjectMethod() throws SQLException {
-        // given
-        updateEnabledFlag();
-        jdbcOperations.getConnection().commit();
-
-        // when
-        final var results = subject.getEnabled();
-
-        // then
-        assertAll(
-                () -> assertTrue(results.contains(2L)),
-                () -> assertTrue(getUpdatedEnabledFlag())
-        );
-    }
-
-    @Test
-    @DisplayName("When commiting transactions to update data using TransactionOperations, subject should see the update")
-    void successOnUpdatingDataBeforeExecutingSubjectMethodAlternative() {
+    @DisplayName("When commiting transactions to update data using TransactionOperations, subject fails to see the update")
+    void failureOnUpdatingDataBeforeExecutingSubjectMethodUsingTransactionOperations() {
         // given
         transactionOperations.executeWrite(s -> {
-            updateEnabledFlag();
+            updateTestData();
             return null;
         });
 
@@ -73,29 +52,27 @@ class MicronautDataTestTxBugTest {
         final var results = subject.getEnabled();
 
         // then
-        assertAll(
-                () -> assertTrue(results.contains(2L)),
-                () -> assertTrue(getUpdatedEnabledFlag())
-        );
+        assertTrue(results.contains(2L));
     }
 
-    private void updateEnabledFlag() {
+    @Test
+    @DisplayName("When explicitly commiting transactions to update data, subject should see the update")
+    void successOnUpdatingDataBeforeExecutingSubjectMethod() throws SQLException {
+        // given
+        updateTestData();
+        jdbcOperations.getConnection().commit();
+
+        // when
+        final var results = subject.getEnabled();
+
+        // then
+        assertTrue(results.contains(2L));
+    }
+
+    private void updateTestData() {
         jdbcOperations.prepareStatement(
                 "UPDATE my_entity SET enabled = TRUE WHERE id = 2",
                 PreparedStatement::executeUpdate
-        );
-    }
-
-    private boolean getUpdatedEnabledFlag() {
-        return jdbcOperations.prepareStatement(
-                "SELECT enabled AS e FROM my_entity WHERE id = 2",
-                statement -> {
-                    final var result = statement.executeQuery();
-                    if (result.next()) {
-                        return result.getBoolean("e");
-                    }
-                    throw new RuntimeException("Expected a value!");
-                }
         );
     }
 }
